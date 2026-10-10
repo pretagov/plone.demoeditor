@@ -57,12 +57,16 @@ def doom_demo_requests(event: IPubAfterTraversal) -> None:
         transaction.doom()
 
 
-def ensure_demo_editor(site, password: str, paths: list[str]) -> None:
+def ensure_demo_editor(
+    site, password: str, paths: list[str], missing_ok: bool = False
+) -> None:
     """Make the demo account on `site`, or reset its password and roles.
 
     `paths` are where it may edit, relative to the site ("/" is the site
     itself): each gets the editing roles as local roles, which its contents
-    inherit.
+    inherit. A path that does not exist raises, unless `missing_ok`: when the
+    add-on is installed before the content is (a distribution's order), the
+    next Zope start grants it.
     """
     users = site.acl_users.source_users
     if DEMO_USER_ID in users.getUserIds():
@@ -75,6 +79,9 @@ def ensure_demo_editor(site, password: str, paths: list[str]) -> None:
         take_back_editing_roles(site, path)
         granted.remove(path)
     for path in paths:
+        if missing_ok and at_path(site, path, None) is None:
+            logger.info("demo editor: %s is not there yet; granted at next start", path)
+            continue
         obj = at_path(site, path)
         if path not in granted:
             granted.append(path)
@@ -85,13 +92,15 @@ def ensure_demo_editor(site, password: str, paths: list[str]) -> None:
         obj.reindexObjectSecurity()
 
 
-def at_path(site, path: str):
-    return site.unrestrictedTraverse(path.strip("/")) if path.strip("/") else site
+def at_path(site, path: str, *default):
+    if not path.strip("/"):
+        return site
+    return site.unrestrictedTraverse(path.strip("/"), *default)
 
 
 def take_back_editing_roles(site, path: str) -> None:
     # The path may be gone since; nothing to take back there.
-    obj = site.unrestrictedTraverse(path.strip("/"), None) if path.strip("/") else site
+    obj = at_path(site, path, None)
     if obj is not None and obj.get_local_roles_for_userid(DEMO_USER_ID):
         obj.manage_delLocalRoles([DEMO_USER_ID])
         obj.reindexObjectSecurity()

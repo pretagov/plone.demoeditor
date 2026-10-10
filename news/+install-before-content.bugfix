@@ -1,0 +1,1 @@
+Installing from a distribution no longer fails when an editing path is not there yet: a distribution installs its profiles before importing its content, so the install makes the account and the next Zope start grants the path. A missing path at startup still stops Zope.
