@@ -1,5 +1,33 @@
-<configure xmlns="http://namespaces.zope.org/zope">
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:genericsetup="http://namespaces.zope.org/genericsetup"
+    >
 
+  <genericsetup:registerProfile
+      name="default"
+      title="Demo editor"
+      description="A public demo account that can edit, and keeps nothing (DEMO_EDITOR_PASSWORD, DEMO_EDITOR_PATHS)"
+      provides="Products.GenericSetup.interfaces.EXTENSION"
+      directory="profiles/default"
+      post_handler=".setuphandlers.post_install"
+      />
+
+  <genericsetup:registerProfile
+      name="uninstall"
+      title="Demo editor (uninstall)"
+      description="Removes the demo account"
+      provides="Products.GenericSetup.interfaces.EXTENSION"
+      directory="profiles/uninstall"
+      post_handler=".setuphandlers.uninstall"
+      />
+
+  <utility
+      factory=".setuphandlers.HiddenProfiles"
+      name="plone.demoeditor-hiddenprofiles"
+      />
+
+  <!-- Keyed on the demo user, not on the layer: should the account ever
+       outlive the add-on, its saves must still be thrown away. -->
   <subscriber
       for="ZPublisher.interfaces.IPubAfterTraversal"
       handler=".demo.doom_demo_requests"

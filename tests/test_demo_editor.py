@@ -6,6 +6,7 @@ from AccessControl.SecurityManagement import noSecurityManager
 from plone import api
 from plone.app.testing import SITE_OWNER_NAME
 from plone.app.testing import SITE_OWNER_PASSWORD
+from plone.base.utils import get_installer
 from plone.demoeditor.demo import DEMO_LOCAL_ROLES
 from plone.demoeditor.demo import DEMO_ROLES
 from plone.demoeditor.demo import DEMO_USER_ID
@@ -166,7 +167,6 @@ def start_zope(functional) -> None:
 def test_startup_makes_the_demo_editor_on_the_named_site(functional, monkeypatch):
     portal = functional["portal"]
     monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "boot-password")
-    monkeypatch.setenv("DEMO_EDITOR_SITE", portal.getId())
     monkeypatch.setenv("DEMO_EDITOR_PATHS", "/")
     start_zope(functional)
     user = api.user.get(username=DEMO_USER_ID)
@@ -187,7 +187,6 @@ def test_startup_resets_an_existing_demo_editor(functional, monkeypatch):
         ["Manager"], DEMO_USER_ID
     )
     monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "new-password")
-    monkeypatch.setenv("DEMO_EDITOR_SITE", portal.getId())
     monkeypatch.setenv("DEMO_EDITOR_PATHS", "/")
     start_zope(functional)
     assert set(api.user.get(username=DEMO_USER_ID).getRoles()) == set(DEMO_ROLES) | {
@@ -202,27 +201,55 @@ def test_startup_resets_an_existing_demo_editor(functional, monkeypatch):
 
 
 def test_startup_makes_no_demo_editor_without_a_password(functional, monkeypatch):
-    portal = functional["portal"]
     monkeypatch.delenv("DEMO_EDITOR_PASSWORD", raising=False)
-    monkeypatch.setenv("DEMO_EDITOR_SITE", portal.getId())
     monkeypatch.setenv("DEMO_EDITOR_PATHS", "/")
     start_zope(functional)
     assert api.user.get(username=DEMO_USER_ID) is None
 
 
-def test_startup_refuses_a_password_without_a_site(functional, monkeypatch):
-    # The account reads whatever its roles allow: which site gets it is
-    # always named, never guessed.
+def uninstall(portal) -> None:
+    with api.env.adopt_roles(["Manager"]):
+        get_installer(portal, portal.REQUEST).uninstall_product("plone.demoeditor")
+    transaction.commit()
+
+
+def test_startup_leaves_a_site_without_the_add_on_alone(functional, monkeypatch):
+    # The demo is per site: only a site with plone.demoeditor installed gets
+    # the account.
+    portal = functional["portal"]
+    uninstall(portal)
     monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "boot-password")
-    monkeypatch.delenv("DEMO_EDITOR_SITE", raising=False)
-    with pytest.raises(KeyError, match="DEMO_EDITOR_SITE"):
-        start_zope(functional)
+    monkeypatch.setenv("DEMO_EDITOR_PATHS", "/")
+    start_zope(functional)
+    assert api.user.get(username=DEMO_USER_ID) is None
+
+
+def test_installing_the_add_on_makes_the_demo_editor(functional, monkeypatch):
+    portal = functional["portal"]
+    uninstall(portal)
+    monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "install-password")
+    monkeypatch.setenv("DEMO_EDITOR_PATHS", "/")
+    with api.env.adopt_roles(["Manager"]):
+        get_installer(portal, portal.REQUEST).install_product("plone.demoeditor")
+    transaction.commit()
+    assert portal.acl_users.authenticate(
+        DEMO_USER_ID, "install-password", functional["request"]
+    )
+
+
+def test_uninstalling_the_add_on_deletes_the_demo_editor(functional, page):
+    # Without the add-on nobody dooms the account's requests on purpose, so a
+    # public password must not outlive it.
+    portal = functional["portal"]
+    uninstall(portal)
+    transaction.begin()
+    assert api.user.get(username=DEMO_USER_ID) is None
+    assert portal.get_local_roles_for_userid(DEMO_USER_ID) == ()
 
 
 def test_startup_refuses_a_password_without_editing_paths(functional, monkeypatch):
     # Where the account may edit (and so read drafts) is named, never guessed.
     monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "boot-password")
-    monkeypatch.setenv("DEMO_EDITOR_SITE", functional["portal"].getId())
     monkeypatch.delenv("DEMO_EDITOR_PATHS", raising=False)
     with pytest.raises(KeyError, match="DEMO_EDITOR_PATHS"):
         start_zope(functional)
@@ -255,3 +282,34 @@ def test_the_demo_edits_only_inside_its_paths(functional):
     assert outside.status_code == 401
     assert "Private elsewhere" not in outside.text
     assert demo.patch("/", json={"title": "x"}).status_code == 401
+
+
+def published_folder(portal, id: str):
+    with api.env.adopt_user(username=SITE_OWNER_NAME):
+        folder = api.content.create(container=portal, type="Folder", id=id, title=id)
+        api.content.transition(obj=folder, transition="publish")
+    return folder
+
+
+def test_a_path_dropped_from_the_settings_loses_its_editing_roles(functional):
+    portal = functional["portal"]
+    guides = published_folder(portal, "guides")
+    published_folder(portal, "docs")
+    ensure_demo_editor(portal, PASSWORD, ["/guides"])
+    ensure_demo_editor(portal, PASSWORD, ["/docs"])
+    assert guides.get_local_roles_for_userid(DEMO_USER_ID) == ()
+    assert set(portal["docs"].get_local_roles_for_userid(DEMO_USER_ID)) == set(
+        DEMO_LOCAL_ROLES
+    )
+
+
+def test_uninstalling_removes_the_editing_roles_on_published_paths(functional):
+    # A published folder's catalog entry names Anonymous, not the demo user,
+    # so the roles must be found from where they were given.
+    portal = functional["portal"]
+    published_folder(portal, "guides")
+    ensure_demo_editor(portal, PASSWORD, ["/guides"])
+    transaction.commit()
+    uninstall(portal)
+    transaction.begin()
+    assert portal["guides"].get_local_roles_for_userid(DEMO_USER_ID) == ()

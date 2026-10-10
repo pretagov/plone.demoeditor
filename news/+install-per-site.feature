@@ -1,0 +1,1 @@
+Per site: the demo is turned on by installing the add-on (profile `plone.demoeditor:default`, with a browser layer), not by naming a site. Installing makes the account, each Zope start makes or resets it on every site that has the add-on, and uninstalling deletes it and its editing roles. `DEMO_EDITOR_SITE` is gone.
