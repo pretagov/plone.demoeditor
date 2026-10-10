@@ -17,7 +17,9 @@ def post_install(setup_tool) -> None:
     """Make the demo account now, if the environment turns the demo on."""
     settings = demo_settings()
     if settings is not None:
-        ensure_demo_editor(aq_parent(aq_inner(setup_tool)), *settings)
+        # A distribution installs profiles before importing its content, so
+        # a path may not be there yet; the next Zope start grants it.
+        ensure_demo_editor(aq_parent(aq_inner(setup_tool)), *settings, missing_ok=True)
 
 
 def uninstall(setup_tool) -> None:

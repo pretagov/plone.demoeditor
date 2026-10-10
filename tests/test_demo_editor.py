@@ -313,3 +313,32 @@ def test_uninstalling_removes_the_editing_roles_on_published_paths(functional):
     uninstall(portal)
     transaction.begin()
     assert portal["guides"].get_local_roles_for_userid(DEMO_USER_ID) == ()
+
+
+def test_installing_before_the_content_exists_grants_at_startup(
+    functional, monkeypatch
+):
+    # A distribution installs its profiles first and imports its content after,
+    # so a path can be missing while the add-on installs. The install makes the
+    # account; the next Zope start, with the content in place, grants the path.
+    portal = functional["portal"]
+    uninstall(portal)
+    monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "install-password")
+    monkeypatch.setenv("DEMO_EDITOR_PATHS", "/guides")
+    with api.env.adopt_roles(["Manager"]):
+        get_installer(portal, portal.REQUEST).install_product("plone.demoeditor")
+    transaction.commit()
+    assert api.user.get(username=DEMO_USER_ID) is not None
+    published_folder(portal, "guides")
+    start_zope(functional)
+    assert set(portal["guides"].get_local_roles_for_userid(DEMO_USER_ID)) == set(
+        DEMO_LOCAL_ROLES
+    )
+
+
+def test_startup_refuses_a_path_that_does_not_exist(functional, monkeypatch):
+    # After the content is in, a missing path is a mistake in the settings.
+    monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "boot-password")
+    monkeypatch.setenv("DEMO_EDITOR_PATHS", "/no-such-folder")
+    with pytest.raises((KeyError, AttributeError), match="no-such-folder"):
+        start_zope(functional)
