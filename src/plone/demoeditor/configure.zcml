@@ -1,0 +1,13 @@
+<configure xmlns="http://namespaces.zope.org/zope">
+
+  <subscriber
+      for="ZPublisher.interfaces.IPubAfterTraversal"
+      handler=".demo.doom_demo_requests"
+      />
+
+  <subscriber
+      for="zope.processlifetime.IDatabaseOpenedWithRoot"
+      handler=".demo.make_demo_editor_at_startup"
+      />
+
+</configure>

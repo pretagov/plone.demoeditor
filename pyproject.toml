@@ -1,0 +1,93 @@
+[project]
+name = "plone.demoeditor"
+version = "1.0.0a1.dev0"
+description = "A public demo editor for a Plone site: it can edit everything, and keeps nothing"
+readme = "README.md"
+license = "GPL-2.0-only"
+requires-python = ">=3.10,<3.14"
+authors = [
+    { name = "PretaGov" },
+]
+keywords = ["CMS", "Plone", "Python", "demo"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: Plone",
+    "Framework :: Plone :: 6.1",
+    "Framework :: Plone :: 6.2",
+    "Framework :: Plone :: Addon",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "Products.CMFPlone",
+    "plone.restapi",
+]
+
+[project.optional-dependencies]
+test = [
+    "plone.app.contenttypes",
+    "plone.app.testing",
+    "plone.restapi[test]",
+    "pytest",
+    "pytest-plone>=1.0.0a2",
+]
+
+[project.entry-points."z3c.autoinclude.plugin"]
+target = "plone"
+
+[build-system]
+requires = ["hatchling>=1.8.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/plone"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "S", "UP", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.ruff.lint.isort]
+case-sensitive = false
+no-sections = true
+force-single-line = true
+from-first = true
+lines-after-imports = 2
+lines-between-types = 1
+order-by-type = false
+
+[tool.towncrier]
+directory = "news/"
+filename = "CHANGES.md"
+start_string = "<!-- towncrier release notes start -->\n"
+title_format = "## {version} ({project_date})"
+template = "news/.changelog_template.jinja"
+issue_format = ""
+
+[[tool.towncrier.type]]
+directory = "feature"
+name = "New features:"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "bugfix"
+name = "Bug fixes:"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "internal"
+name = "Internal:"
+showcontent = true
