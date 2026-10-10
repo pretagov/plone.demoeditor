@@ -10,10 +10,11 @@ real editor's requests on the same site are untouched.
 
 ## Read this first
 
-Doom protects writes, not reads. The `demo` account sees whatever its roles
-(Member, Contributor, Editor, Reviewer) let it see, **private content
-included**. Its password is public by design. Enable it only on a site whose
-content anyone may see.
+Doom protects writes, not reads. Where it may edit, the `demo` account
+(Contributor, Editor and Reviewer there) sees **private content too**. Its
+password is public by design. Give it only paths whose drafts anyone may see.
+Elsewhere on the site it is just a Member, and sees what any signed-in user
+sees.
 
 Doom covers the ZODB. Anything an add-on does outside the transaction, such
 as calling a webhook or another service, purging a cache or writing a file,
@@ -22,16 +23,26 @@ mail is queued until commit, so a doomed request sends none.
 
 ## Turning it on
 
-Install the package; its ZCML is picked up by `z3c.autoinclude` (or include
-`plone.demoeditor` yourself). Then set, on the Plone backend:
+Add the package to the Plone backend; its ZCML is picked up by
+`z3c.autoinclude` (or include `plone.demoeditor` yourself). Set:
 
 | Variable | |
 | --- | --- |
 | `DEMO_EDITOR_PASSWORD` | The `demo` account's password. Unset, there is no demo account. |
-| `DEMO_EDITOR_SITE` | The id of the one site the account is made on. Required with the password: Zope does not start without it. |
+| `DEMO_EDITOR_PATHS` | Where it may edit: comma-separated paths relative to the site, `/` for all of it, e.g. `/components,/guides`. Required with the password: Zope does not start without it. |
 
-When Zope starts, it makes the `demo` account on that site, or resets its
-password and roles if it is already there.
+Then **install the add-on on the site** that gets the demo: Site Setup → Add-ons
+→ Demo editor, or `plone.demoeditor:default` in a distribution's profiles. Only
+sites that have it installed get the account. Others in the same Zope are left
+alone.
+
+Installing makes the `demo` account. Each time Zope starts, it is made again,
+or its password and roles reset, on every site that has the add-on, with
+Contributor, Editor and Reviewer as local roles on each path. A path dropped
+from the setting loses them. Uninstalling deletes the account and its roles.
+
+The doom itself is keyed on the `demo` user, not on the add-on being installed:
+should the account ever outlive the add-on, its saves are still thrown away.
 
 The editor's half is Inka's demo link, `/login?demo&return_url=<page>/edit`,
 with `RAZZLE_DEMO_LOGIN=demo` and `RAZZLE_DEMO_PASSWORD` (the same password)

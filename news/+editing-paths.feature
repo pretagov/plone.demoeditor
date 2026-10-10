@@ -1,0 +1,1 @@
+The demo account edits only where `DEMO_EDITOR_PATHS` says: its editing roles are local roles on those paths, so private content elsewhere on the site stays out of its sight. `DEMO_EDITOR_PATHS` is required with the password.

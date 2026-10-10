@@ -18,6 +18,7 @@ class Layer(PloneSandboxLayer):
     def setUpPloneSite(self, portal):
         # plone.restapi's profile adds the JWT plugin that @login signs in with.
         applyProfile(portal, "plone.restapi:default")
+        applyProfile(portal, "plone.demoeditor:default")
 
 
 FIXTURE = Layer()
