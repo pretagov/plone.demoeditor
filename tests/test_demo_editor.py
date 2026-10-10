@@ -6,6 +6,7 @@ from AccessControl.SecurityManagement import noSecurityManager
 from plone import api
 from plone.app.testing import SITE_OWNER_NAME
 from plone.app.testing import SITE_OWNER_PASSWORD
+from plone.demoeditor.demo import DEMO_LOCAL_ROLES
 from plone.demoeditor.demo import DEMO_ROLES
 from plone.demoeditor.demo import DEMO_USER_ID
 from plone.demoeditor.demo import ensure_demo_editor
@@ -25,7 +26,7 @@ PASSWORD = "demo-password"  # noqa: S105  a test account's password
 @pytest.fixture
 def page(functional):
     portal = functional["portal"]
-    ensure_demo_editor(portal, PASSWORD)
+    ensure_demo_editor(portal, PASSWORD, ["/"])
     with api.env.adopt_user(username=SITE_OWNER_NAME):
         doc = api.content.create(
             container=portal, type="Document", id="page", title="Original title"
@@ -166,10 +167,12 @@ def test_startup_makes_the_demo_editor_on_the_named_site(functional, monkeypatch
     portal = functional["portal"]
     monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "boot-password")
     monkeypatch.setenv("DEMO_EDITOR_SITE", portal.getId())
+    monkeypatch.setenv("DEMO_EDITOR_PATHS", "/")
     start_zope(functional)
     user = api.user.get(username=DEMO_USER_ID)
     assert user is not None
     assert set(user.getRoles()) == set(DEMO_ROLES) | {"Authenticated"}
+    assert set(user.getRolesInContext(portal)) >= set(DEMO_LOCAL_ROLES)
     assert portal.acl_users.authenticate(
         DEMO_USER_ID, "boot-password", functional["request"]
     )
@@ -179,12 +182,13 @@ def test_startup_resets_an_existing_demo_editor(functional, monkeypatch):
     # A site that persists across restarts already has the account: the next
     # start sets the current password and roles rather than failing.
     portal = functional["portal"]
-    ensure_demo_editor(portal, "old-password")
+    ensure_demo_editor(portal, "old-password", ["/"])
     portal.acl_users.portal_role_manager.assignRolesToPrincipal(
         ["Manager"], DEMO_USER_ID
     )
     monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "new-password")
     monkeypatch.setenv("DEMO_EDITOR_SITE", portal.getId())
+    monkeypatch.setenv("DEMO_EDITOR_PATHS", "/")
     start_zope(functional)
     assert set(api.user.get(username=DEMO_USER_ID).getRoles()) == set(DEMO_ROLES) | {
         "Authenticated"
@@ -201,6 +205,7 @@ def test_startup_makes_no_demo_editor_without_a_password(functional, monkeypatch
     portal = functional["portal"]
     monkeypatch.delenv("DEMO_EDITOR_PASSWORD", raising=False)
     monkeypatch.setenv("DEMO_EDITOR_SITE", portal.getId())
+    monkeypatch.setenv("DEMO_EDITOR_PATHS", "/")
     start_zope(functional)
     assert api.user.get(username=DEMO_USER_ID) is None
 
@@ -212,3 +217,41 @@ def test_startup_refuses_a_password_without_a_site(functional, monkeypatch):
     monkeypatch.delenv("DEMO_EDITOR_SITE", raising=False)
     with pytest.raises(KeyError, match="DEMO_EDITOR_SITE"):
         start_zope(functional)
+
+
+def test_startup_refuses_a_password_without_editing_paths(functional, monkeypatch):
+    # Where the account may edit (and so read drafts) is named, never guessed.
+    monkeypatch.setenv("DEMO_EDITOR_PASSWORD", "boot-password")
+    monkeypatch.setenv("DEMO_EDITOR_SITE", functional["portal"].getId())
+    monkeypatch.delenv("DEMO_EDITOR_PATHS", raising=False)
+    with pytest.raises(KeyError, match="DEMO_EDITOR_PATHS"):
+        start_zope(functional)
+
+
+def test_the_demo_edits_only_inside_its_paths(functional):
+    # A site can hold content the public must not read: the demo account gets
+    # its editing roles on the paths it is given, and nowhere else.
+    portal = functional["portal"]
+    with api.env.adopt_user(username=SITE_OWNER_NAME):
+        docs = api.content.create(
+            container=portal, type="Folder", id="docs", title="Docs"
+        )
+        api.content.create(
+            container=docs, type="Document", id="draft", title="A docs draft"
+        )
+        api.content.create(
+            container=portal, type="Document", id="secret", title="Private elsewhere"
+        )
+    ensure_demo_editor(portal, PASSWORD, ["/docs"])
+    transaction.commit()
+    demo = session(portal, token=demo_token(portal))
+
+    inside = demo.get("/docs/draft")
+    assert inside.status_code == 200
+    assert inside.json()["title"] == "A docs draft"
+    assert demo.patch("/docs/draft", json={"title": "x"}).status_code == 204
+
+    outside = demo.get("/secret")
+    assert outside.status_code == 401
+    assert "Private elsewhere" not in outside.text
+    assert demo.patch("/", json={"title": "x"}).status_code == 401

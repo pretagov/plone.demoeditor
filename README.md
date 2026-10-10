@@ -10,10 +10,11 @@ real editor's requests on the same site are untouched.
 
 ## Read this first
 
-Doom protects writes, not reads. The `demo` account sees whatever its roles
-(Member, Contributor, Editor, Reviewer) let it see, **private content
-included**. Its password is public by design. Enable it only on a site whose
-content anyone may see.
+Doom protects writes, not reads. Where it may edit, the `demo` account
+(Contributor, Editor and Reviewer there) sees **private content too**. Its
+password is public by design. Give it only paths whose drafts anyone may see.
+Elsewhere on the site it is just a Member, and sees what any signed-in user
+sees.
 
 Doom covers the ZODB. Anything an add-on does outside the transaction, such
 as calling a webhook or another service, purging a cache or writing a file,
@@ -28,10 +29,15 @@ Install the package; its ZCML is picked up by `z3c.autoinclude` (or include
 | Variable | |
 | --- | --- |
 | `DEMO_EDITOR_PASSWORD` | The `demo` account's password. Unset, there is no demo account. |
-| `DEMO_EDITOR_SITE` | The id of the one site the account is made on. Required with the password: Zope does not start without it. |
+| `DEMO_EDITOR_SITE` | The id of the one site the account is made on. |
+| `DEMO_EDITOR_PATHS` | Where on that site it may edit: comma-separated paths relative to the site, `/` for all of it, e.g. `/components,/guides`. |
+
+The site and the paths are required with the password: Zope does not start
+without them.
 
 When Zope starts, it makes the `demo` account on that site, or resets its
-password and roles if it is already there.
+password and roles if it is already there, and gives it Contributor, Editor
+and Reviewer as local roles on each path.
 
 The editor's half is Inka's demo link, `/login?demo&return_url=<page>/edit`,
 with `RAZZLE_DEMO_LOGIN=demo` and `RAZZLE_DEMO_PASSWORD` (the same password)
