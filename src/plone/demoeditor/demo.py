@@ -155,3 +155,35 @@ def make_demo_editor_at_startup(event: IDatabaseOpenedWithRoot) -> None:
                     settings[1],
                     site.getId(),
                 )
+
+
+# The Zope root's admin, the account a Plone instance is made with.
+ADMIN_USER_ID = "admin"
+
+
+def set_admin_password(app, password: str) -> None:
+    """Set the Zope root admin's password, leaving its roles alone.
+
+    A Plone instance's root user folder is a PluggableAuthService; its users
+    live in the ZODBUserManager plugin `users`. A root with no admin raises:
+    there is nothing to protect, and nothing was protected.
+    """
+    users = app.acl_users.users
+    if users.getUserById(ADMIN_USER_ID) is None:
+        raise LookupError(f"no root user {ADMIN_USER_ID!r} to set a password for")
+    users.updateUserPassword(ADMIN_USER_ID, password)
+
+
+def set_admin_password_at_startup(event: IDatabaseOpenedWithRoot) -> None:
+    """Set the root admin's password from DEMO_ADMIN_PASSWORD when Zope starts.
+
+    The admin lives outside any site, so a demo that recreates its site on
+    every start keeps the password the instance was made with — on a public
+    URL, usually the image's default. Unset, the password is left alone.
+    """
+    password = os.environ.get("DEMO_ADMIN_PASSWORD", "").strip()
+    if not password:
+        return
+    with event.database.transaction() as connection:
+        set_admin_password(connection.root()["Application"], password)
+    logger.info("root %r password set from DEMO_ADMIN_PASSWORD", ADMIN_USER_ID)

@@ -38,4 +38,11 @@
       handler=".demo.make_demo_editor_at_startup"
       />
 
+  <!-- The root admin's password, from DEMO_ADMIN_PASSWORD. Not per site: the
+       admin lives in the Zope root, outside every site. -->
+  <subscriber
+      for="zope.processlifetime.IDatabaseOpenedWithRoot"
+      handler=".demo.set_admin_password_at_startup"
+      />
+
 </configure>

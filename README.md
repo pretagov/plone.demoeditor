@@ -30,6 +30,7 @@ Add the package to the Plone backend; its ZCML is picked up by
 | --- | --- |
 | `DEMO_EDITOR_PASSWORD` | The `demo` account's password. Unset, there is no demo account. |
 | `DEMO_EDITOR_PATHS` | Where it may edit: comma-separated paths relative to the site, `/` for all of it, e.g. `/components,/guides`. Required with the password: Zope does not start without it. |
+| `DEMO_ADMIN_PASSWORD` | The root `admin` account's password, set at each start (see below). Unset, it is left alone. |
 
 Then **install the add-on on the site** that gets the demo: Site Setup → Add-ons
 → Demo editor, or `plone.demoeditor:default` in a distribution's profiles. Only
@@ -47,6 +48,19 @@ should the account ever outlive the add-on, its saves are still thrown away.
 The editor's half is Inka's demo link, `/login?demo&return_url=<page>/edit`,
 with `RAZZLE_DEMO_LOGIN=demo` and `RAZZLE_DEMO_PASSWORD` (the same password)
 set on the admin. Link a button to it.
+
+## The admin password
+
+A demo is public, so its admin password has to be a secret. The admin lives in
+the Zope root's user folder, outside every site: a demo that recreates its site
+on each start keeps whatever password the instance was made with, which is
+usually the image's default.
+
+Set `DEMO_ADMIN_PASSWORD` and each time Zope starts the root `admin` gets that
+password; its roles are left alone. Unset, the password is not touched. A root
+with no `admin` user stops Zope from starting rather than run unprotected.
+
+This applies to the whole instance, whichever sites have the add-on installed.
 
 ## Signing in
 
