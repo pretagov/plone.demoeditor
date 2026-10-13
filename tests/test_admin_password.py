@@ -7,12 +7,11 @@ was made with — on a public URL, that is usually the image's default.
 """
 
 from AccessControl.SecurityManagement import noSecurityManager
+from OFS.userfolder import UserFolder
 from plone.app.testing import SITE_OWNER_NAME
 from plone.app.testing import SITE_OWNER_PASSWORD
 from plone.demoeditor.demo import set_admin_password_at_startup
 from zope.processlifetime import DatabaseOpenedWithRoot
-
-from OFS.userfolder import UserFolder
 
 import pytest
 import transaction
@@ -73,7 +72,9 @@ def test_startup_sets_it_in_a_classic_root_user_folder(functional, monkeypatch):
     app = functional["app"]
     app._delObject("acl_users")
     app._setObject("acl_users", UserFolder())
-    app.acl_users.userFolderAddUser(SITE_OWNER_NAME, SITE_OWNER_PASSWORD, ["Manager"], [])
+    app.acl_users.userFolderAddUser(
+        SITE_OWNER_NAME, SITE_OWNER_PASSWORD, ["Manager"], []
+    )
     transaction.commit()
     monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "a-secret-password")
     start_zope(functional)
