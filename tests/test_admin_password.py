@@ -12,6 +12,8 @@ from plone.app.testing import SITE_OWNER_PASSWORD
 from plone.demoeditor.demo import set_admin_password_at_startup
 from zope.processlifetime import DatabaseOpenedWithRoot
 
+from OFS.userfolder import UserFolder
+
 import pytest
 import transaction
 
@@ -61,3 +63,21 @@ def test_startup_refuses_when_there_is_no_admin(functional, monkeypatch):
     monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "a-secret-password")
     with pytest.raises(LookupError):
         start_zope(functional)
+
+
+def test_startup_sets_it_in_a_classic_root_user_folder(functional, monkeypatch):
+    # A fresh database's root has Zope's classic user folder until Plone's
+    # setup replaces it, and a demo that recreates its database on every boot
+    # starts on exactly that: the admin password step ran then, found no PAS
+    # `users` plugin, and stopped Zope from starting.
+    app = functional["app"]
+    app._delObject("acl_users")
+    app._setObject("acl_users", UserFolder())
+    app.acl_users.userFolderAddUser(SITE_OWNER_NAME, SITE_OWNER_PASSWORD, ["Manager"], [])
+    transaction.commit()
+    monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "a-secret-password")
+    start_zope(functional)
+    user = app.acl_users.getUser(SITE_OWNER_NAME)
+    assert user.authenticate("a-secret-password", functional["request"])
+    assert not user.authenticate(SITE_OWNER_PASSWORD, functional["request"])
+    assert "Manager" in user.getRoles()
