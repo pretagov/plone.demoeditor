@@ -14,6 +14,7 @@ only on sites that have plone.demoeditor installed.
 from AccessControl import getSecurityManager
 from persistent.list import PersistentList
 from plone.restapi.services.auth.login import Login
+from Products.PluggableAuthService.interfaces.authservice import IPluggableAuthService
 from Testing.makerequest import makerequest
 from zope.annotation.interfaces import IAnnotations
 from zope.processlifetime import IDatabaseOpenedWithRoot
@@ -164,14 +165,26 @@ ADMIN_USER_ID = "admin"
 def set_admin_password(app, password: str) -> None:
     """Set the Zope root admin's password, leaving its roles alone.
 
-    A Plone instance's root user folder is a PluggableAuthService; its users
-    live in the ZODBUserManager plugin `users`. A root with no admin raises:
-    there is nothing to protect, and nothing was protected.
+    Once Plone has set up the root, its user folder is a
+    PluggableAuthService whose users live in the ZODBUserManager plugin
+    `users`. A fresh database's root still has Zope's classic user folder —
+    and a demo that recreates its database on every boot starts on that. A
+    root with no admin raises: there is nothing to protect, and nothing was
+    protected.
     """
-    users = app.acl_users.users
-    if users.getUserById(ADMIN_USER_ID) is None:
+    acl_users = app.acl_users
+    if IPluggableAuthService.providedBy(acl_users):
+        users = acl_users.users
+        if users.getUserById(ADMIN_USER_ID) is None:
+            raise LookupError(f"no root user {ADMIN_USER_ID!r} to set a password for")
+        users.updateUserPassword(ADMIN_USER_ID, password)
+        return
+    user = acl_users.getUser(ADMIN_USER_ID)
+    if user is None:
         raise LookupError(f"no root user {ADMIN_USER_ID!r} to set a password for")
-    users.updateUserPassword(ADMIN_USER_ID, password)
+    # getRoles() adds the implicit Authenticated role; it is not stored.
+    roles = [r for r in user.getRoles() if r not in ("Authenticated", "Anonymous")]
+    acl_users.userFolderEditUser(ADMIN_USER_ID, password, roles, user.getDomains())
 
 
 def set_admin_password_at_startup(event: IDatabaseOpenedWithRoot) -> None:
