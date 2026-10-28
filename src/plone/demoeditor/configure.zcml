@@ -1,7 +1,26 @@
 <configure
     xmlns="http://namespaces.zope.org/zope"
     xmlns:genericsetup="http://namespaces.zope.org/genericsetup"
+    xmlns:plone="http://namespaces.plone.org/plone"
     >
+
+  <include package="plone.rest" file="meta.zcml" />
+
+  <!-- Signing in as the demo without a password (login.py): a login option
+       (GET @login) and the sign-in itself. Both answer only where the demo
+       is on. -->
+  <adapter
+      factory=".login.DemoLoginProvider"
+      name="plone.demoeditor"
+      />
+
+  <plone:service
+      method="POST"
+      name="@login-demo"
+      for="plone.base.interfaces.siteroot.IPloneSiteRoot"
+      factory=".login.DemoLogin"
+      permission="zope2.Public"
+      />
 
   <genericsetup:registerProfile
       name="default"
