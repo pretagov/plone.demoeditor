@@ -45,9 +45,21 @@ from the setting loses them. Uninstalling deletes the account and its roles.
 The doom itself is keyed on the `demo` user, not on the add-on being installed:
 should the account ever outlive the add-on, its saves are still thrown away.
 
-The editor's half is Inka's demo link, `/login?demo&return_url=<page>/edit`,
-with `RAZZLE_DEMO_LOGIN=demo` and `RAZZLE_DEMO_PASSWORD` (the same password)
-set on the admin. Link a button to it.
+## Signing in as the demo
+
+The password is public, so nobody needs to type it, and no admin needs to hold
+it. Where the demo is on (the add-on installed, the account there):
+
+- `GET @login` lists it among the site's login options, beside any others
+  (Google, …):
+  `{"id": "demo", "plugin": "demo", "title": "Try it as a demo editor", "url": "<site>/@login-demo"}`.
+  A login page shows it as a button.
+- `POST @login-demo` signs the visitor in as `demo` with no password, and
+  answers `{"token": …}` as `@login` does. Where the demo is off it answers 404.
+
+Inka's login page shows the option, and its demo link,
+`/login?demo&return_url=<page>/edit`, presses it for the visitor: one link
+opens the editor. Link a "Try editing" button to it.
 
 ## The admin password
 
@@ -62,9 +74,9 @@ with no `admin` user stops Zope from starting rather than run unprotected.
 
 This applies to the whole instance, whichever sites have the add-on installed.
 
-## Signing in
+## What is not doomed
 
-`@login` is the one demo request that is not doomed. Its only writes are the
+`@login` and `@login-demo` are the demo requests that are not doomed. Its only writes are the
 sign-in's own. One of them is plone.protect's weekly rotation of the keyring
 that signs the token. Throwing that rotation away would leave the token signed
 with a secret no later request knows, and every request after sign-in would
